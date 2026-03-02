@@ -1,0 +1,39 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: nugget
+      POSTGRES_USER: nugget
+      POSTGRES_PASSWORD: nugget
+    ports:
+      - "${DB_PORT:-5433}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  api:
+    build:
+      context: ./apps/api
+    environment:
+      DATABASE_URL: postgresql+psycopg://nugget:nugget@db:5432/nugget
+      CORS_ORIGINS: http://localhost:${WEB_PORT:-3001}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_RAG_MODEL: ${OPENAI_RAG_MODEL:-gpt-4.1-mini}
+      OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
+      SEED_ON_STARTUP: ${SEED_ON_STARTUP:-false}
+    depends_on:
+      - db
+    ports:
+      - "${API_PORT:-8001}:8000"
+
+  web:
+    build:
+      context: ./apps/web
+    environment:
+      API_BASE_URL: http://api:8000
+    depends_on:
+      - api
+    ports:
+      - "${WEB_PORT:-3001}:3000"
+
+volumes:
+  postgres_data:
