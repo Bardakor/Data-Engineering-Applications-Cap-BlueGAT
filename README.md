@@ -6,11 +6,52 @@ Map-first analytics platform with:
 - a feedback dashboard
 - a CheepChat RAG assistant
 - CSV and JSON ingestion endpoints
+- **api_pusher** – fake data generator (Ollama or random) for campaign feedbacks & sales
+
+Based on [api_pusher](https://github.com/Prjprj/api_pusher) for the EFREI Data Engineering Applications course.
+
+---
+
+## How the database works
+
+PostgreSQL stores three tables:
+
+| Table             | Purpose                                                                 |
+|-------------------|-------------------------------------------------------------------------|
+| `sales`           | Transactions: username, sale_date, country, region, product, quantity, amounts |
+| `campaign_products` | Mapping: campaign_id → product (e.g. CAMP012 → Chicken Nuggets)      |
+| `feedback`        | Customer feedback: username, campaign_id, comment, sentiment (auto-computed) |
+
+**Data flow (api_pusher → API → database):**
+
+1. **api_pusher** generates fake data in two ways:
+   - **CSV mode** → creates `sales.csv` and `campaign_product.csv`
+   - **PUSH mode** → sends JSON feedback directly to the API
+
+2. **Ingestion order matters:**
+   - Upload **campaign mapping** first (so campaign_id → product is known)
+   - Upload **sales** second (so username → country/region exists)
+   - Push **feedback** last (API enriches each feedback with product/country/region from sales)
+
+3. **Feedback enrichment:** When you ingest feedback, the API looks up the username in `sales` to fill product, country, region. If no sale exists, those fields stay empty.
+
+**Data formats (api_pusher compatible):**
+
+| Type              | Format | Example |
+|-------------------|--------|---------|
+| Feedback (JSON)   | `username`, `feedback_date`, `campaign_id`, `comment` | `{"username":"user_demo","feedback_date":"2025-01-01","campaign_id":"CAMP012","comment":"demo"}` |
+| Sales (CSV)        | `username,sale_date,country,product,quantity,unit_price,total_amount` | `user149,2025-05-10,India,Chicken Nuggets,5,11.14,55.7` |
+| Campaign mapping (CSV) | `campaign_id,product` | `CAMP012,Spicy Strips` |
+
+**Visualize the database:** Adminer runs at `http://localhost:8080`. Login: Server `db`, User `nugget`, Password `nugget`, Database `nugget`.
+
+---
 
 ## Project structure
 
 - `apps/web`: Next.js 16 frontend
 - `apps/api`: FastAPI backend
+- `tools/api_pusher`: Fake data generator (PUSH to API or CSV files)
 - `docker-compose.yml`: full local stack
 
 ## Prerequisites
@@ -27,6 +68,10 @@ For a manual local run:
 - Python 3.11
 - PostgreSQL 16
 
+For **api_pusher** with AI generation:
+
+- [Ollama](https://ollama.com) (or LM Studio – see config)
+
 ## Recommended way: run with Docker
 
 ### 1. Create the environment file
@@ -40,6 +85,7 @@ cp .env.example .env
 Optional:
 
 - set `OPENAI_API_KEY` if you want OpenAI-backed RAG answers
+- or use **Ollama** for local RAG: run `ollama pull tinyllama`, set `OLLAMA_BASE_URL=http://host.docker.internal:11434` in `.env` when using Docker
 - keep `SEED_ON_STARTUP=true` if you want demo data loaded automatically on first start
 
 ### 2. Start the stack
@@ -55,6 +101,7 @@ docker compose up --build
 - Web app: `http://localhost:3001`
 - API docs: `http://localhost:8001/docs`
 - API health: `http://localhost:8001/health`
+- Database UI (Adminer): `http://localhost:8080` → Server `db`, User `nugget`, Password `nugget`
 
 ### 4. Stop the stack
 
@@ -139,7 +186,7 @@ before starting the API.
 
 ## First-run data seeding
 
-There are two ways to populate demo data:
+There are three ways to populate demo data:
 
 ### Option 1. Automatic seeding on startup
 
@@ -159,6 +206,57 @@ If the stack is already running:
 curl -X POST http://localhost:8001/api/v1/seed/demo
 ```
 
+### Option 3. api_pusher – generate fake data (Ollama or random)
+
+The **api_pusher** tool generates campaign feedbacks and sales data compatible with the Nugget API.
+
+**1. Install Ollama (optional, for AI-generated data)**
+
+```bash
+# Install Ollama: https://ollama.com
+# Then pull the smallest model (~638MB):
+ollama pull tinyllama
+```
+
+**2. Ensure the API is running** (Docker or manual) so `http://localhost:8001` is up.
+
+**3. Push feedbacks to the API**
+
+```bash
+# From project root – manual mode (random, no Ollama needed):
+python -m tools.api_pusher PUSH 10
+
+# With Ollama: edit tools/api_pusher/config.ini, set mode = ollama
+python -m tools.api_pusher PUSH 10
+```
+
+**4. Generate CSV files** (sales + campaign/product mapping)
+
+```bash
+python -m tools.api_pusher CSV 20
+```
+
+This creates `sales.csv` and `campaign_product.csv` in the current directory. Then ingest them:
+
+```bash
+curl -X POST http://localhost:8001/api/v1/ingest/campaign-mapping-csv -F "file=@campaign_product.csv"
+curl -X POST http://localhost:8001/api/v1/ingest/sales-csv -F "file=@sales.csv"
+```
+
+**Config:** `tools/api_pusher/config.ini`
+
+- `endpoint_url` – Nugget API (default `http://localhost:8001/api/v1/ingest/feedback`)
+- `ollama_url` – `127.0.0.1:11434` for Ollama; LM Studio uses a different port if you enable its local server
+- `ollama_model` – `tinyllama` (smallest, ~638MB) or `phi3:mini`, `llama3.2:1b`, etc.
+- `mode` – `manual` (random, no LLM) or `ollama` (local LLM)
+
+**Quick Ollama setup:**
+
+```bash
+./scripts/setup-ollama.sh
+# or: ollama pull tinyllama
+```
+
 ## API endpoints
 
 Main endpoints:
@@ -171,7 +269,7 @@ Main endpoints:
 - `GET /api/v1/data/preview`
 - `POST /api/v1/ingest/sales-csv`
 - `POST /api/v1/ingest/campaign-mapping-csv`
-- `POST /afc/api`
+- `POST /api/v1/ingest/feedback`
 
 ## Quick validation commands
 
@@ -196,7 +294,7 @@ curl http://localhost:8001/api/v1/dashboard/sales
 ### Send feedback in the `api_pusher` format
 
 ```bash
-curl -X POST http://localhost:8001/afc/api \
+curl -X POST http://localhost:8001/api/v1/ingest/feedback \
   -H "Content-Type: application/json" \
   -d '[
     {
@@ -246,10 +344,11 @@ These values are read from the root `.env` file:
 - `WEB_PORT` default: `3001`
 - `API_PORT` default: `8001`
 - `DB_PORT` default: `5433`
+- `ADMINER_PORT` default: `8080` (database web UI)
 
 ## Notes
 
 - The frontend proxies backend requests through `apps/web/src/app/api/backend/[...path]/route.ts`
 - In Docker, the frontend talks to the API with `API_BASE_URL=http://api:8000`
 - In local development, the frontend defaults to `http://localhost:8001` if `API_BASE_URL` is not set
-- OpenAI is optional; without an API key, RAG falls back to lexical retrieval
+- OpenAI is optional; without an API key, RAG uses lexical retrieval + Ollama (if running) for answers

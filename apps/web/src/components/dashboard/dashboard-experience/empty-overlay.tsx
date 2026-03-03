@@ -21,7 +21,7 @@ export function EmptyOverlay() {
         </h2>
         <p className="mt-3 text-sm leading-6 text-muted-foreground">
           The interface now reads only from the backend API and database. Ingest
-          sales CSV data and push feedback events to `/afc/api`, then refresh.
+          sales CSV data and push feedback events to `/api/v1/ingest/feedback`, then refresh.
         </p>
         <div className="mt-5 grid gap-3 text-left sm:grid-cols-3">
           <InfoBlock icon={<Globe2 className="size-4" />} text="Upload sales CSV" />

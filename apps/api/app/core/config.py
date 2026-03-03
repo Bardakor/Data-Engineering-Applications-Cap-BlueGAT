@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     openai_embedding_model: str = "text-embedding-3-small"
     seed_on_startup: bool = False
 
+    # Ollama (local LLM) - used for RAG answers when OpenAI is not configured
+    ollama_base_url: str = "http://127.0.0.1:11434"
+    ollama_chat_model: str = "tinyllama"
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]

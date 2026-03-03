@@ -16,3 +16,8 @@ apps/api/.venv/
 apps/api/.env
 
 postgres_data/
+
+# api_pusher
+api_pusher.log
+sales.csv
+campaign_product.csv

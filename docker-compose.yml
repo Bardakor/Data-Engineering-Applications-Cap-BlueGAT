@@ -19,6 +19,8 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_RAG_MODEL: ${OPENAI_RAG_MODEL:-gpt-4.1-mini}
       OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      OLLAMA_CHAT_MODEL: ${OLLAMA_CHAT_MODEL:-tinyllama}
       SEED_ON_STARTUP: ${SEED_ON_STARTUP:-false}
     depends_on:
       - db
@@ -34,6 +36,15 @@ services:
       - api
     ports:
       - "${WEB_PORT:-3001}:3000"
+
+  adminer:
+    image: adminer:latest
+    depends_on:
+      - db
+    ports:
+      - "${ADMINER_PORT:-8080}:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: db
 
 volumes:
   postgres_data:
