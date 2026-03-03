@@ -95,6 +95,14 @@ From the repository root:
 docker compose up --build
 ```
 
+**Fresh data (wipe DB + seed demo):**
+
+```bash
+make newdata
+# or: ./scripts/newdata.sh
+# or: docker compose down -v && SEED_ON_STARTUP=true docker compose up --build
+```
+
 ### 3. Open the app
 
 - Web app: `http://localhost:3001`
