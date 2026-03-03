@@ -20,8 +20,8 @@ def usage() -> None:
     print("  CSV <count>   - Generate sales + campaign_product CSV files (e.g. CSV 10)")
     print()
     print("Examples:")
-    print("  python -m tools.api_pusher PUSH 10")
-    print("  python -m tools.api_pusher CSV 20")
+    print("  cd apps/api && python -m tools.api_pusher PUSH 10")
+    print("  cd apps/api && python -m tools.api_pusher CSV 20")
 
 
 def main(arguments: list[str]) -> int:

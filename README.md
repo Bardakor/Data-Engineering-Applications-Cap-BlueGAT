@@ -50,8 +50,7 @@ PostgreSQL stores three tables:
 ## Project structure
 
 - `apps/web`: Next.js 16 frontend
-- `apps/api`: FastAPI backend
-- `tools/api_pusher`: Fake data generator (PUSH to API or CSV files)
+- `apps/api`: FastAPI backend (includes `tools/api_pusher` – fake data generator)
 - `docker-compose.yml`: full local stack
 
 ## Prerequisites
@@ -208,7 +207,7 @@ curl -X POST http://localhost:8001/api/v1/seed/demo
 
 ### Option 3. api_pusher – generate fake data (Ollama or random)
 
-The **api_pusher** tool generates campaign feedbacks and sales data compatible with the Nugget API.
+The **api_pusher** tool lives in the backend (`apps/api/tools/api_pusher`) and generates campaign feedbacks and sales data compatible with the Nugget API.
 
 **1. Install Ollama (optional, for AI-generated data)**
 
@@ -223,27 +222,27 @@ ollama pull tinyllama
 **3. Push feedbacks to the API**
 
 ```bash
-# From project root – manual mode (random, no Ollama needed):
-python -m tools.api_pusher PUSH 10
+# From apps/api – manual mode (random, no Ollama needed):
+cd apps/api && python -m tools.api_pusher PUSH 10
 
-# With Ollama: edit tools/api_pusher/config.ini, set mode = ollama
-python -m tools.api_pusher PUSH 10
+# With Ollama: edit apps/api/tools/api_pusher/config.ini, set mode = ollama
+cd apps/api && python -m tools.api_pusher PUSH 10
 ```
 
 **4. Generate CSV files** (sales + campaign/product mapping)
 
 ```bash
-python -m tools.api_pusher CSV 20
+cd apps/api && python -m tools.api_pusher CSV 20
 ```
 
-This creates `sales.csv` and `campaign_product.csv` in the current directory. Then ingest them:
+This creates `sales.csv` and `campaign_product.csv` in `apps/api/`. Then ingest them:
 
 ```bash
-curl -X POST http://localhost:8001/api/v1/ingest/campaign-mapping-csv -F "file=@campaign_product.csv"
-curl -X POST http://localhost:8001/api/v1/ingest/sales-csv -F "file=@sales.csv"
+curl -X POST http://localhost:8001/api/v1/ingest/campaign-mapping-csv -F "file=@apps/api/campaign_product.csv"
+curl -X POST http://localhost:8001/api/v1/ingest/sales-csv -F "file=@apps/api/sales.csv"
 ```
 
-**Config:** `tools/api_pusher/config.ini`
+**Config:** `apps/api/tools/api_pusher/config.ini`
 
 - `endpoint_url` – Nugget API (default `http://localhost:8001/api/v1/ingest/feedback`)
 - `ollama_url` – `127.0.0.1:11434` for Ollama; LM Studio uses a different port if you enable its local server
