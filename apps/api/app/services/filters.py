@@ -1,10 +1,23 @@
 """Filter normalization and options."""
 
+from datetime import date
+
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models import Sale
 from app.reference import DEFAULT_DATE_FROM, DEFAULT_DATE_TO
+
+
+def _parse_date_or_default(value: str | None, default: str) -> str:
+    """Return value if it's a valid ISO date, else default."""
+    if not value:
+        return default
+    try:
+        date.fromisoformat(value)
+        return value
+    except (ValueError, TypeError):
+        return default
 
 
 def normalize_filters(
@@ -19,15 +32,13 @@ def normalize_filters(
         "product": product or "All products",
         "country": country or "All countries",
         "region": region or "All regions",
-        "dateFrom": date_from or DEFAULT_DATE_FROM,
-        "dateTo": date_to or DEFAULT_DATE_TO,
+        "dateFrom": _parse_date_or_default(date_from, DEFAULT_DATE_FROM),
+        "dateTo": _parse_date_or_default(date_to, DEFAULT_DATE_TO),
     }
 
 
 def build_filter_options(session: Session) -> dict[str, object]:
     """Build available filter options from database."""
-    from datetime import date
-
     products = [
         row[0]
         for row in session.execute(select(Sale.product).distinct().order_by(Sale.product))

@@ -278,6 +278,94 @@ Main endpoints:
 - `POST /api/v1/ingest/campaign-mapping-csv`
 - `POST /api/v1/ingest/feedback`
 
+---
+
+## How each endpoint works
+
+### Root & health
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/` | Returns app info and links to docs, dashboards, and ingest endpoints. |
+| `GET` | `/health` | Health check. Returns `{"status": "ok"}`. |
+| `GET` | `/docs` | Swagger UI – interactive API documentation. |
+| `GET` | `/openapi.json` | OpenAPI 3.1 schema. |
+
+### Dashboard
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/v1/dashboard/sales` | Sales analytics: revenue, orders, growth by country/region/product, trend over time. |
+| `GET` | `/api/v1/dashboard/feedback` | Feedback analytics: sentiment by country/campaign, topic signals, campaign impact. |
+
+**Query parameters** (optional, for both dashboard endpoints):
+
+- `product` – Filter by product (default: `All products`)
+- `country` – Filter by country (default: `All countries`)
+- `region` – Filter by region (default: `All regions`)
+- `date_from` – Start date, ISO format `YYYY-MM-DD`
+- `date_to` – End date, ISO format `YYYY-MM-DD`
+
+### Data
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/v1/data/preview` | Sample data for UI preview: last 40 sales, 40 feedback rows, and all campaign mappings. No filters. |
+| `GET` | `/api/v1/data/sales` | List all sales rows, optionally filtered by product, country, region, date range. |
+| `GET` | `/api/v1/data/feedback` | List all feedback rows, optionally filtered by product, country, region, date range. |
+| `GET` | `/api/v1/data/campaigns` | List all campaign–product mappings (campaign_id → product). |
+
+**Query parameters** (optional, for `/sales` and `/feedback`): same as dashboard (`product`, `country`, `region`, `date_from`, `date_to`).
+
+### Ingest
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/v1/ingest/sales-csv` | Upload a sales CSV. Expects `file` (multipart/form-data). Returns `{"sales": N}`. |
+| `POST` | `/api/v1/ingest/campaign-mapping-csv` | Upload a campaign mapping CSV. Expects `file` (multipart/form-data). Returns `{"campaigns": N}`. |
+| `POST` | `/api/v1/ingest/feedback` | Ingest feedback as JSON array. Each item: `username`, `feedback_date`, `campaign_id`, `comment`. Returns `{"feedback": N}`. |
+
+**Ingestion order:** Upload campaign mapping first, then sales, then feedback (so the API can enrich feedback with product/country/region from sales).
+
+### RAG (CheepChat)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/v1/rag/query` | RAG query over feedback. Retrieves relevant feedback, then generates an answer via Ollama (or OpenAI if configured). |
+
+**Request body** (JSON):
+
+```json
+{
+  "query": "What are the main complaints in recent feedback?",
+  "filters": {
+    "product": "All products",
+    "country": "All countries",
+    "region": "All regions",
+    "dateFrom": "2025-09-01",
+    "dateTo": "2026-03-04"
+  }
+}
+```
+
+- `query` – Natural language question (min 3 characters).
+- `filters` – Optional. Same semantics as dashboard filters. Invalid dates fall back to defaults.
+
+**Response:**
+
+- `answer` – Generated answer (from Ollama, OpenAI, or fallback template).
+- `retrievalMode` – `lexical` (keyword) or `openai` (embeddings).
+- `generationMode` – `ollama`, `openai`, or `fallback` (proves answer came from LLM vs template).
+- `citations` – Up to 5 feedback rows used as context (feedbackId, campaignId, product, country, comment, etc.).
+
+### Seed
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/v1/seed/demo` | Reseed demo data. If tables are empty, inserts sales, campaigns, and feedback. Returns counts (`{"sales": N, "campaigns": N, "feedback": N}`). If already seeded, returns existing counts. |
+
+---
+
 ## Quick validation commands
 
 ### Health check

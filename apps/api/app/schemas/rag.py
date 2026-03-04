@@ -18,3 +18,20 @@ class RagQueryPayload(BaseModel):
 
     query: str = Field(min_length=3)
     filters: RagFilterPayload | None = None
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "query": "What are the main complaints in recent feedback?",
+                    "filters": {
+                        "product": "All products",
+                        "country": "All countries",
+                        "region": "All regions",
+                        "dateFrom": "2025-09-01",
+                        "dateTo": "2026-03-04",
+                    },
+                },
+            ]
+        }
+    }
