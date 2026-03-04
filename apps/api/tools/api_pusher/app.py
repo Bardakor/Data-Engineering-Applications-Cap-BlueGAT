@@ -5,6 +5,7 @@ Business logic - main functions for api_pusher
 import codecs
 import json
 import logging
+from urllib import request
 
 from tools.api_pusher.business.generate_campaign_feedback import (
     generate_feedback_via_ollama,
@@ -15,6 +16,20 @@ from tools.api_pusher.business.generate_sales_file import (
     generate_sales_via_ollama,
 )
 from tools.api_pusher.http_client.http_client import send_json
+
+
+def fetch_valid_feedback_pairs(api_endpoint_url: str, timeout: int) -> list[dict[str, str]]:
+    """Fetch (username, campaign_id) pairs from API for enrichment. Returns [] on failure."""
+    base = api_endpoint_url.rsplit("/", 1)[0]
+    url = f"{base}/feedback-valid-pairs?limit=500"
+    try:
+        req = request.Request(url=url, method="GET")
+        with request.urlopen(req, timeout=timeout) as resp:
+            if resp.getcode() == 200:
+                return json.loads(resp.read().decode("utf-8"))
+    except Exception as e:
+        logging.warning("Could not fetch valid feedback pairs: %s", e)
+    return []
 
 
 def push_campaign_feedbacks_to_api(
@@ -41,6 +56,10 @@ def push_campaign_feedbacks_to_api(
     payload: list = []
     logging.info(f"Generation mode: {generation_mode}")
 
+    valid_pairs = fetch_valid_feedback_pairs(api_endpoint_url, api_timeout_seconds)
+    if valid_pairs:
+        logging.info("Using %d valid (username, campaign_id) pairs for enrichment", len(valid_pairs))
+
     if generation_mode == "ollama":
         logging.info("Local AI generation mode, using Ollama")
         payload = generate_feedback_via_ollama(
@@ -48,10 +67,15 @@ def push_campaign_feedbacks_to_api(
             model=ollama_model,
             host=ollama_url,
             timeout=300,
+            valid_pairs=valid_pairs or None,
         )
     else:
         logging.info("Manual generation mode, using random functions")
-        payload = generate_random_feedback(feedbacks_to_push, payload)
+        payload = generate_random_feedback(
+            feedbacks_to_push,
+            payload,
+            valid_pairs=valid_pairs or None,
+        )
 
     try:
         resp = send_json(

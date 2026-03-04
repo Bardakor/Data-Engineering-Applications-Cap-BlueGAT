@@ -10,35 +10,46 @@ import urllib.request
 
 from tools.api_pusher.business import allowed_comments, random_date
 
+# Valid values for Nugget API enrichment (must match reference + seed)
+VALID_CAMPAIGN_IDS = (
+    "CAMP012", "CAMP013", "CAMP019", "CAMP021", "CAMP024",
+    "CAMP028", "CAMP031", "CAMP033", "CAMP040", "CAMP042",
+)
+VALID_USERNAMES = [f"user{i:03d}" for i in range(1, 361)]
 
-def generate_random_feedback(feedbacks_to_push: int, payload: list) -> list:
+
+def generate_random_feedback(
+    feedbacks_to_push: int,
+    payload: list,
+    valid_pairs: list[dict[str, str]] | None = None,
+) -> list:
     """
     Generate random feedbacks.
 
     :param feedbacks_to_push: number of feedbacks to push
     :param payload: existing payload (list to append to)
+    :param valid_pairs: optional (username, campaign_id) pairs from API for enrichment
     :return: payload with generated feedbacks appended
     """
     result = list(payload)
+    rng = random.Random()
     for _ in range(feedbacks_to_push):
-        user_number = random.randint(1, 4999)
-        campaign_date = random_date("2024-1-1", "2026-12-31", random.random())
-        campaign_number = random.randint(1, 999)
-
-        comment_number = random.randint(1, len(allowed_comments))
-        comment = allowed_comments[comment_number - 1]
-        logging.debug(f"Random comment number: {comment_number}, comment: {comment}")
-
+        if valid_pairs:
+            pair = rng.choice(valid_pairs)
+            username, campaign_id = pair["username"], pair["campaign_id"]
+        else:
+            username = f"user_{rng.randint(1, 4999)}"
+            campaign_id = f"CAMP{rng.randint(1, 999):03d}"
+        campaign_date = random_date("2024-1-1", "2026-12-31", rng.random())
+        comment = rng.choice(allowed_comments)
         item_to_add = {
-            "username": f"user_{user_number}",
+            "username": username,
             "feedback_date": campaign_date,
-            "campaign_id": f"CAMP{campaign_number:03d}",
+            "campaign_id": campaign_id,
             "comment": comment,
         }
-
         logging.debug(f"Manual generation, item: {item_to_add}")
         result.append(item_to_add)
-
     return result
 
 
@@ -48,6 +59,7 @@ def generate_feedback_via_ollama(
     host: str = "127.0.0.1:11434",
     temperature: float = 0.7,
     timeout: int = 300,
+    valid_pairs: list[dict[str, str]] | None = None,
 ) -> list:
     """
     Generate `count` feedback objects via Ollama API.
@@ -87,14 +99,15 @@ def generate_feedback_via_ollama(
         "Do not include explanations or extra text."
     )
 
+    campaigns_str = ", ".join(VALID_CAMPAIGN_IDS)
     user_prompt = f"""
 Generate {count} distinct feedback objects as a JSON array.
 Rules:
-- "username": random usernames like in social network, no obscene name.
-- "feedback_date": valid date "YYYY-MM-DD" in the year 2024, 2025 and 2026.
-- "campaign_id": "CAMP" followed by three digits (e.g. CAMP147).
-- "comment": choose a random number between 0 and {len(allowed_comments) - 1} (index into comments list).
-Ensure all items are valid and diverse. Return only JSON.
+- "username": MUST be one of user001, user002, ... user360 (pick randomly, can repeat).
+- "feedback_date": valid date "YYYY-MM-DD" in 2024, 2025 or 2026.
+- "campaign_id": MUST be one of: {campaigns_str}
+- "comment": integer 0 to {len(allowed_comments) - 1} (index). Use DIFFERENT indices for each item.
+Ensure all items are valid. Return only JSON.
 """
 
     url = f"http://{host}/api/generate"
@@ -134,15 +147,33 @@ Ensure all items are valid and diverse. Return only JSON.
     else:
         items = response
 
+    rng = random.Random()
     result = []
-    for item in items:
-        comment_idx = int(item.get("comment", 0)) % len(allowed_comments)
+    used_comment_indices = set()
+    for i, item in enumerate(items):
+        if valid_pairs:
+            pair = rng.choice(valid_pairs)
+            username, campaign_id = pair["username"], pair["campaign_id"]
+        else:
+            username = str(item.get("username", ""))
+            if username not in VALID_USERNAMES:
+                username = rng.choice(VALID_USERNAMES)
+            campaign_id = str(item.get("campaign_id", ""))
+            if campaign_id not in VALID_CAMPAIGN_IDS:
+                campaign_id = rng.choice(VALID_CAMPAIGN_IDS)
+        feedback_date = str(item.get("feedback_date", "2025-01-01"))
+        comment_idx = int(item.get("comment", i % len(allowed_comments))) % len(allowed_comments)
+        if comment_idx in used_comment_indices and len(used_comment_indices) < len(allowed_comments):
+            available = [j for j in range(len(allowed_comments)) if j not in used_comment_indices]
+            comment_idx = rng.choice(available) if available else comment_idx
+        used_comment_indices.add(comment_idx)
+        comment = allowed_comments[comment_idx]
         result.append(
             {
-                "username": str(item["username"]),
-                "feedback_date": str(item["feedback_date"]),
-                "campaign_id": str(item["campaign_id"]),
-                "comment": allowed_comments[comment_idx],
+                "username": username,
+                "feedback_date": feedback_date,
+                "campaign_id": campaign_id,
+                "comment": comment,
             }
         )
         logging.debug(f"Ollama response item: {result[-1]}")

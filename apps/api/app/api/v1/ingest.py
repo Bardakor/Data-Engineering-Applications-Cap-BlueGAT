@@ -5,9 +5,23 @@ from sqlalchemy.orm import Session
 
 from app.database import get_session
 from app.schemas import FeedbackPayload
-from app.services import ingest_campaign_csv, ingest_feedback_payloads, ingest_sales_csv
+from app.services import (
+    get_valid_feedback_pairs,
+    ingest_campaign_csv,
+    ingest_feedback_payloads,
+    ingest_sales_csv,
+)
 
 router = APIRouter(prefix="/ingest", tags=["ingest"])
+
+
+@router.get("/feedback-valid-pairs")
+def get_feedback_valid_pairs_endpoint(
+    session: Session = Depends(get_session),
+    limit: int = 500,
+) -> list[dict[str, str]]:
+    """Return (username, campaign_id) pairs that have matching sales for enrichment."""
+    return get_valid_feedback_pairs(session, limit=limit)
 
 
 @router.post("/sales-csv")

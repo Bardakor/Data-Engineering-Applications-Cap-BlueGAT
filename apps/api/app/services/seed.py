@@ -32,7 +32,7 @@ def seed_database(session: Session) -> dict[str, int]:
     rng = random.Random(42)
     users = [f"user{index:03d}" for index in range(1, 361)]
     countries = list(COUNTRY_REFERENCE.keys())
-    country_weights = [11, 9, 10, 8, 7, 8, 6, 5, 4, 4]
+    country_weights = [11, 9, 10, 8, 7, 8, 6, 5, 4, 4, 3, 3, 2]
     products = list(PRODUCT_PRICES.keys())
     product_weights = [14, 11, 8, 10, 7]
     current_day = date.today() - timedelta(days=220)

@@ -3,6 +3,7 @@
 from app.services.dashboards import build_feedback_dashboard, build_sales_dashboard
 from app.services.filters import build_filter_options, normalize_filters
 from app.services.ingestion import (
+    get_valid_feedback_pairs,
     ingest_campaign_csv,
     ingest_feedback_payloads,
     ingest_sales_csv,
@@ -15,6 +16,7 @@ from app.services.seed import seed_database
 
 __all__ = [
     "build_data_preview",
+    "get_valid_feedback_pairs",
     "build_feedback_dashboard",
     "build_filter_options",
     "build_sales_dashboard",

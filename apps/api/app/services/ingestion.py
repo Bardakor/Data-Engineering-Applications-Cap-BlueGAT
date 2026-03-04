@@ -13,6 +13,18 @@ from app.schemas import FeedbackPayload
 from app.services.sentiment import analyze_sentiment
 
 
+def get_valid_feedback_pairs(session: Session, limit: int = 500) -> list[dict[str, str]]:
+    """Return (username, campaign_id) pairs that have matching sales for enrichment."""
+    stmt = (
+        select(Sale.username, CampaignProduct.campaign_id)
+        .join(CampaignProduct, Sale.product == CampaignProduct.product)
+        .distinct()
+        .limit(limit)
+    )
+    rows = session.execute(stmt).all()
+    return [{"username": r[0], "campaign_id": r[1]} for r in rows]
+
+
 def enrich_feedback_context(
     session: Session, username: str, campaign_id: str
 ) -> tuple[str | None, str | None, str | None]:
