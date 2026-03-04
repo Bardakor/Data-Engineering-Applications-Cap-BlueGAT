@@ -146,8 +146,12 @@ export function ChatOverlay({
           <div className="grid gap-4 lg:grid-cols-3">
             <MiniStat
               label="Mode"
-              value={latestAssistantMessage?.retrievalMode ?? "waiting"}
-              detail="current engine"
+              value={
+                [latestAssistantMessage?.retrievalMode, latestAssistantMessage?.generationMode]
+                  .filter(Boolean)
+                  .join(" · ") || "waiting"
+              }
+              detail="retrieval · generation"
             />
             <MiniStat
               label="Last ask"
@@ -196,15 +200,17 @@ export function ChatOverlay({
                         <div className="mono-label">
                           {message.role === "assistant" ? "Assistant" : "You"}
                         </div>
-                        {message.retrievalMode ? (
+                        {(message.retrievalMode || message.generationMode) ? (
                           <Badge
                             variant="outline"
                             className={cn(
                               "rounded-full px-3 py-1 text-[10px]",
-                              retrievalTone(message.retrievalMode),
+                              retrievalTone(message.retrievalMode ?? message.generationMode ?? ""),
                             )}
                           >
-                            {message.retrievalMode}
+                            {[message.retrievalMode, message.generationMode]
+                              .filter(Boolean)
+                              .join(" · ")}
                           </Badge>
                         ) : null}
                       </div>
@@ -256,11 +262,13 @@ export function ChatOverlay({
                 />
                 <div className="mt-3 flex items-center justify-between gap-3">
                   <div className="text-xs text-muted-foreground">
-                    `Enter` sends, `Shift + Enter` adds a new line.
+                    {isChatting
+                      ? "Local AI may take 20–30s…"
+                      : "`Enter` sends, `Shift + Enter` adds a new line."}
                   </div>
                   <Button className="rounded-full px-5" onClick={onSubmit} disabled={isChatting}>
                     <SendHorizontal className="mr-2 size-4" />
-                    {isChatting ? "Thinking..." : "Ask"}
+                    {isChatting ? "Thinking…" : "Ask"}
                   </Button>
                 </div>
               </div>
@@ -275,10 +283,16 @@ export function ChatOverlay({
                   variant="outline"
                   className={cn(
                     "rounded-full px-3 py-1.5 text-[11px]",
-                    retrievalTone(latestAssistantMessage?.retrievalMode),
+                    retrievalTone(
+                      latestAssistantMessage?.retrievalMode ??
+                        latestAssistantMessage?.generationMode ??
+                        "",
+                    ),
                   )}
                 >
-                  {latestAssistantMessage?.retrievalMode ?? "waiting"}
+                  {[latestAssistantMessage?.retrievalMode, latestAssistantMessage?.generationMode]
+                    .filter(Boolean)
+                    .join(" · ") || "waiting"}
                 </Badge>
                 <Badge variant="outline" className="rounded-full px-3 py-1.5 text-[11px]">
                   {citationCount} citations

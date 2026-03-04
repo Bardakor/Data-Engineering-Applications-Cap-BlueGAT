@@ -85,26 +85,31 @@ def answer_without_openai(query: str, citations: list[dict[str, object]]) -> str
     )
 
 
-def answer_with_ollama(query: str, context: str) -> str | None:
+def answer_with_ollama(query: str, context: str, *, general_mode: bool = False) -> str | None:
     """Call Ollama chat API. Returns None if unavailable."""
     base = settings.ollama_base_url.rstrip("/")
     url = f"{base}/api/chat"
+    system_content = (
+        "You are a helpful retail analytics assistant. Be concise. For greetings or simple questions, reply in 1 short sentence."
+        if general_mode
+        else (
+            "You are a retail analytics assistant. Answer only from the supplied feedback snippets. "
+            "Be concise, mention the dominant themes, and do not invent facts."
+        )
+    )
+    # Limit tokens to speed up responses (tinyllama on CPU is slow)
+    options = {"num_predict": 80 if general_mode else 150}
     payload = {
         "model": settings.ollama_chat_model,
         "messages": [
-            {
-                "role": "system",
-                "content": (
-                    "You are a retail analytics assistant. Answer only from the supplied feedback snippets. "
-                    "Be concise, mention the dominant themes, and do not invent facts."
-                ),
-            },
+            {"role": "system", "content": system_content},
             {
                 "role": "user",
-                "content": f"User question: {query}\n\nEvidence:\n{context}",
+                "content": f"User question: {query}\n\nEvidence:\n{context}" if not general_mode else query,
             },
         ],
         "stream": False,
+        "options": options,
     }
     try:
         req = urllib.request.Request(
@@ -128,6 +133,7 @@ def run_feedback_rag(session: Session, query: str, filters: dict[str, str]) -> d
         return {
             "answer": "No feedback is available for the selected filters.",
             "retrievalMode": "empty",
+            "generationMode": "fallback",
             "citations": [],
         }
 
@@ -169,7 +175,10 @@ def run_feedback_rag(session: Session, query: str, filters: dict[str, str]) -> d
         for row in top_rows
     ]
 
-    if client and citations:
+    # CheepChat always uses Ollama when use_ollama_for_rag is True (default)
+    use_ollama = settings.use_ollama_for_rag
+    generation_mode: str = "fallback"
+    if client and citations and not use_ollama:
         context = "\n\n".join(
             f"[{index + 1}] {build_feedback_document(row)}"
             for index, row in enumerate(top_rows)
@@ -203,18 +212,32 @@ def run_feedback_rag(session: Session, query: str, filters: dict[str, str]) -> d
                 ],
             )
             answer = response.choices[0].message.content or ""
+        generation_mode = "openai"
     elif citations:
         context = "\n\n".join(
             f"[{index + 1}] {build_feedback_document(row)}"
             for index, row in enumerate(top_rows)
         )
         ollama_answer = answer_with_ollama(query, context)
-        answer = ollama_answer if ollama_answer else answer_without_openai(query, citations)
+        if ollama_answer:
+            answer = ollama_answer
+            generation_mode = "ollama"
+        else:
+            answer = answer_without_openai(query, citations)
+            generation_mode = "fallback"
     else:
-        answer = answer_without_openai(query, citations)
+        # No citations: still try Ollama for general questions (e.g. "are you a llama?")
+        ollama_answer = answer_with_ollama(query, "", general_mode=True)
+        if ollama_answer:
+            answer = ollama_answer
+            generation_mode = "ollama"
+        else:
+            answer = answer_without_openai(query, citations)
+            generation_mode = "fallback"
 
     return {
         "answer": answer,
         "retrievalMode": retrieval_mode,
+        "generationMode": generation_mode,
         "citations": citations,
     }

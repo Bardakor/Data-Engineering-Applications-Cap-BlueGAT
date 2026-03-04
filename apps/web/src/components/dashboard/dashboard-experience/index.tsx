@@ -342,6 +342,7 @@ export function DashboardExperience() {
           content: result.answer,
           citations: result.citations,
           retrievalMode: result.retrievalMode,
+          generationMode: result.generationMode,
         },
       ]);
     } catch (submitError) {

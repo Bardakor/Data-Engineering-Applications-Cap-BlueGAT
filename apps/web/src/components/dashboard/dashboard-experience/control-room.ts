@@ -142,6 +142,7 @@ export function buildControlRoomState(
     growthChain,
     chatMeta: {
       retrievalMode: latestRetrievalMessage?.retrievalMode ?? "waiting",
+      generationMode: latestRetrievalMessage?.generationMode ?? "waiting",
       lastPrompt: lastUserMessage ? truncateMiddle(lastUserMessage.content, 34) : "No prompt yet",
       citations: latestRetrievalMessage?.citations?.length ?? 0,
     },

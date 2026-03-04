@@ -156,6 +156,8 @@ export interface RagCitation {
 export interface RagResponse {
   answer: string;
   retrievalMode: string;
+  /** "ollama" | "openai" | "fallback" – proves answer came from LLM vs template */
+  generationMode: string;
   citations: RagCitation[];
 }
 

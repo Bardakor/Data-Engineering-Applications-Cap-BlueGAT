@@ -21,6 +21,7 @@ services:
       OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       OLLAMA_CHAT_MODEL: ${OLLAMA_CHAT_MODEL:-tinyllama}
+      USE_OLLAMA_FOR_RAG: ${USE_OLLAMA_FOR_RAG:-true}
       SEED_ON_STARTUP: ${SEED_ON_STARTUP:-false}
     depends_on:
       - db

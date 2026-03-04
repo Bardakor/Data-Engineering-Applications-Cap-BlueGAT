@@ -20,9 +20,10 @@ class Settings(BaseSettings):
     openai_embedding_model: str = "text-embedding-3-small"
     seed_on_startup: bool = False
 
-    # Ollama (local LLM) - used for RAG answers when OpenAI is not configured
+    # Ollama (local LLM) - used for RAG/CheepChat answers
     ollama_base_url: str = "http://127.0.0.1:11434"
     ollama_chat_model: str = "tinyllama"
+    use_ollama_for_rag: bool = True  # Force CheepChat to use Ollama (ignore OpenAI for generation)
 
     @property
     def cors_origins_list(self) -> list[str]:

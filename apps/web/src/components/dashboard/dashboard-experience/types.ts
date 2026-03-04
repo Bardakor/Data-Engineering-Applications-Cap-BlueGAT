@@ -36,6 +36,8 @@ export type ChatMessage = {
   role: "assistant" | "user";
   content: string;
   retrievalMode?: string;
+  /** "ollama" | "openai" | "fallback" – proves answer came from LLM */
+  generationMode?: string;
   citations?: RagCitation[];
 };
 
